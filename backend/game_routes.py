@@ -73,7 +73,7 @@ async def list_prompts(
         query["difficulty"] = difficulty
     if q:
         query["text"] = {"$regex": q, "$options": "i"}
-    rows = await db.prompts.find(query, {"_id": 0}).limit(limit).to_list(limit)
+    rows = await db.prompts.find(query, {"_id": 0}).sort("created_at", -1).limit(limit).to_list(limit)
     return {"prompts": rows, "count": len(rows)}
 
 
