@@ -7,14 +7,16 @@ OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 # OpenRouter free Nemotron variants. Order = preference.
 NEMOTRON_MODELS = [
     "nvidia/nemotron-nano-9b-v2:free",
-    "nvidia/llama-3.1-nemotron-ultra-253b-v1:free",
+    "meta-llama/llama-3.3-70b-instruct:free",
+    "google/gemini-2.0-flash-exp:free",
 ]
 
 
 SYSTEM_PROMPT = (
     "You are a literary prompt generator for a competitive creative-writing game called "
-    "Ivory Draft. Generate a single, evocative, original writing prompt in 1-2 sentences. "
-    "Do NOT include any preamble, numbering, quotes, or commentary. Just the prompt itself."
+    "Ivory Draft. Generate exactly ONE evocative, original writing prompt in 1-2 sentences. "
+    "Output the final prompt on the LAST line. Do NOT include any preamble, numbering, "
+    "quotes, or commentary — just the prompt itself."
 )
 
 
@@ -44,16 +46,29 @@ async def generate_prompt(genre: str = "Fantasy", difficulty: str = "medium") ->
                             {"role": "system", "content": SYSTEM_PROMPT},
                             {"role": "user", "content": user_msg},
                         ],
-                        "max_tokens": 120,
+                        "max_tokens": 1200,  # generous: Nemotron is a reasoning model
                         "temperature": 0.95,
                     },
                 )
                 if r.status_code == 200:
                     data = r.json()
-                    text = data["choices"][0]["message"]["content"].strip()
-                    # Clean leading/trailing quotes
-                    text = text.strip('"\'')
-                    return text
+                    choice = (data.get("choices") or [{}])[0]
+                    msg = choice.get("message") or {}
+                    text = (msg.get("content") or "").strip()
+                    # Reasoning models may put final answer after reasoning;
+                    # if content is empty, mine the tail of reasoning as the prompt.
+                    if not text:
+                        reasoning = (msg.get("reasoning") or "").strip()
+                        if reasoning:
+                            # Take last non-empty line/sentence as the prompt
+                            lines = [ln.strip() for ln in reasoning.split("\n") if ln.strip()]
+                            if lines:
+                                text = lines[-1]
+                    text = text.strip().strip('"\'').strip()
+                    if text and len(text) > 12:
+                        return text
+                    last_err = Exception(f"{model}: empty content (finish={choice.get('finish_reason')})")
+                    continue
                 last_err = Exception(f"{model}: {r.status_code} {r.text[:200]}")
             except Exception as e:
                 last_err = e
