@@ -1,73 +1,65 @@
-from fastapi import FastAPI, APIRouter
+"""Ivory Draft - FastAPI backend."""
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
 from pathlib import Path
-from pydantic import BaseModel, Field, ConfigDict
-from typing import List
-import uuid
-from datetime import datetime, timezone
-
+from contextlib import asynccontextmanager
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-# MongoDB connection
-mongo_url = os.environ['MONGO_URL']
-client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ['DB_NAME']]
+from auth import router as auth_router
+from game_routes import router as game_router
+from ws_manager import manager
+from prompts_seed import get_seed_prompts
+from models import Prompt
 
-# Create the main app without a prefix
-app = FastAPI()
-
-# Create a router with the /api prefix
-api_router = APIRouter(prefix="/api")
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger("ivory-draft")
 
 
-# Define Models
-class StatusCheck(BaseModel):
-    model_config = ConfigDict(extra="ignore")  # Ignore MongoDB's _id field
-    
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    client_name: str
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    mongo_url = os.environ['MONGO_URL']
+    client = AsyncIOMotorClient(mongo_url)
+    db = client[os.environ['DB_NAME']]
+    app.state.client = client
+    app.state.db = db
 
-class StatusCheckCreate(BaseModel):
-    client_name: str
+    # Indexes
+    await db.users.create_index("user_id", unique=True)
+    await db.users.create_index("email", unique=True)
+    await db.user_sessions.create_index("session_token", unique=True)
+    await db.user_sessions.create_index("user_id")
+    await db.games.create_index("game_id", unique=True)
+    await db.games.create_index("join_code", unique=True)
+    await db.prompts.create_index("prompt_id", unique=True)
+    await db.submissions.create_index("submission_id", unique=True)
+    await db.submissions.create_index([("game_id", 1), ("round_number", 1), ("user_id", 1)])
+    await db.scores.create_index("score_id", unique=True)
+    await db.scores.create_index([("game_id", 1), ("round_number", 1), ("scored_by", 1), ("submission_id", 1)])
 
-# Add your routes to the router instead of directly to app
-@api_router.get("/")
-async def root():
-    return {"message": "Hello World"}
+    # Seed prompts if empty
+    count = await db.prompts.count_documents({})
+    if count == 0:
+        seed = get_seed_prompts()
+        docs = []
+        for s in seed:
+            p = Prompt(**s)
+            d = p.model_dump()
+            d["created_at"] = d["created_at"].isoformat()
+            docs.append(d)
+        if docs:
+            await db.prompts.insert_many(docs)
+            logger.info(f"Seeded {len(docs)} prompts")
+    yield
+    client.close()
 
-@api_router.post("/status", response_model=StatusCheck)
-async def create_status_check(input: StatusCheckCreate):
-    status_dict = input.model_dump()
-    status_obj = StatusCheck(**status_dict)
-    
-    # Convert to dict and serialize datetime to ISO string for MongoDB
-    doc = status_obj.model_dump()
-    doc['timestamp'] = doc['timestamp'].isoformat()
-    
-    _ = await db.status_checks.insert_one(doc)
-    return status_obj
 
-@api_router.get("/status", response_model=List[StatusCheck])
-async def get_status_checks():
-    # Exclude MongoDB's _id field from the query results
-    status_checks = await db.status_checks.find({}, {"_id": 0}).to_list(1000)
-    
-    # Convert ISO string timestamps back to datetime objects
-    for check in status_checks:
-        if isinstance(check['timestamp'], str):
-            check['timestamp'] = datetime.fromisoformat(check['timestamp'])
-    
-    return status_checks
-
-# Include the router in the main app
-app.include_router(api_router)
+app = FastAPI(title="Ivory Draft API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -77,13 +69,39 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+# Routers
+app.include_router(auth_router)
+app.include_router(game_router)
 
-@app.on_event("shutdown")
-async def shutdown_db_client():
-    client.close()
+
+@app.get("/api/")
+async def root():
+    return {"name": "Ivory Draft", "status": "ok"}
+
+
+@app.get("/api/health")
+async def health(request: Request):
+    db = request.app.state.db
+    try:
+        await db.command("ping")
+        return {"ok": True}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.websocket("/api/ws/game/{game_id}")
+async def ws_game(websocket: WebSocket, game_id: str):
+    await manager.connect(game_id, websocket)
+    try:
+        # Send hello
+        await websocket.send_json({"type": "connected", "game_id": game_id})
+        while True:
+            msg = await websocket.receive_text()
+            # Echo pings; clients can send {"type":"ping"}
+            if msg:
+                await websocket.send_json({"type": "ack"})
+    except WebSocketDisconnect:
+        await manager.disconnect(game_id, websocket)
+    except Exception as e:
+        logger.error(f"WS error: {e}")
+        await manager.disconnect(game_id, websocket)
