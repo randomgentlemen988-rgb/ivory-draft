@@ -1,0 +1,118 @@
+{
+  "theme": "dark",
+  "archetype": "Archetype 4 (Swiss & High-Contrast) & Archetype 5 (Jewel & Luxury)",
+  "vibe": "A professional esports platform fused with a luxury writing studio. Linear + Notion + Modern Code Editor.",
+  "typography": {
+    "headings": {
+      "family": "Geist, Inter, 'SF Pro Display', sans-serif",
+      "weight": "font-medium to font-semibold",
+      "tracking": "tracking-tight",
+      "description": "Used for all major section headings, marketing copy, and cinematic moments."
+    },
+    "body": {
+      "family": "Geist, Inter, 'SF Pro Text', sans-serif",
+      "weight": "font-normal",
+      "description": "Used for standard body copy and editor writing."
+    },
+    "technical": {
+      "family": "'JetBrains Mono', monospace",
+      "weight": "font-normal to font-medium",
+      "tracking": "tracking-widest for labels",
+      "description": "Used for timers, word counts, player stats, rank numbers, and developer-style labels."
+    },
+    "scales": {
+      "h1": "text-4xl sm:text-5xl lg:text-6xl tracking-tighter",
+      "h2": "text-2xl sm:text-3xl lg:text-4xl tracking-tight",
+      "h3": "text-xl sm:text-2xl",
+      "h4": "text-lg sm:text-xl",
+      "body": "text-base",
+      "small": "text-sm",
+      "overline": "text-xs uppercase tracking-[0.2em] font-mono"
+    }
+  },
+  "color_palette": {
+    "background": {
+      "primary": "#000000",
+      "secondary": "#09090B",
+      "tertiary": "#121212",
+      "glass": "bg-black/60 backdrop-blur-xl"
+    },
+    "surface": {
+      "default": "#18181B",
+      "hover": "#27272A",
+      "border": "#27272A",
+      "border_glow": "rgba(255,255,255,0.1)"
+    },
+    "text": {
+      "primary": "#FAFAFA",
+      "secondary": "#A1A1AA",
+      "muted": "#71717A",
+      "inverted": "#09090B"
+    },
+    "accent": {
+      "primary": "#FFFFFF",
+      "primary_hover": "#E4E4E7",
+      "timer_warning": "#EF4444",
+      "success": "#10B981"
+    }
+  },
+  "spacing_and_layout": {
+    "philosophy": "Generous spacing. Dense data combined with wide breathing room for focus.",
+    "dashboard_grid": "Bento-style grids (grid-cols-1 md:grid-cols-3 lg:grid-cols-4) with gap-6. 1px borders.",
+    "cards": "Flat background, 1px subtle border (border-zinc-800), rounded-xl. No heavy drop shadows; use inner glows (shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05)]).",
+    "editor_layout": "Max-w-prose centered, padding-y 32, complete distraction-free zone, bottom sticky bar for word count and timer.",
+    "container_padding": "px-6 md:px-12 lg:px-24"
+  },
+  "components": {
+    "buttons": {
+      "primary": "bg-white text-black hover:bg-zinc-200 transition-colors rounded-md px-6 py-2 font-medium",
+      "secondary": "bg-transparent border border-zinc-800 text-white hover:bg-zinc-900 transition-colors rounded-md px-6 py-2",
+      "ghost": "hover:bg-zinc-900 text-zinc-400 hover:text-white transition-colors"
+    },
+    "inputs": {
+      "style": "bg-zinc-950 border border-zinc-800 rounded-md focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500 text-white placeholder:text-zinc-600"
+    },
+    "game_timer": {
+      "style": "font-mono text-3xl md:text-5xl tabular-nums font-medium text-white",
+      "animation": "Smooth scaling on warning (last 1 min). Cinematic red pulse."
+    },
+    "editor": {
+      "style": "text-lg md:text-xl leading-relaxed text-zinc-300 placeholder:text-zinc-700 font-sans border-none focus:ring-0 resize-none w-full bg-transparent"
+    }
+  },
+  "motion_and_interactions": {
+    "hover": "Subtle opacity and bg-color shifts (e.g. bg-zinc-900 to bg-zinc-800).",
+    "page_transitions": "Fade and slight Y-translate (framer-motion).",
+    "leaderboard": "Staggered entrance animations. Position swap animations using LayoutGroup.",
+    "typing": "Smooth cursor blinking, distraction-free fade-out of UI when actively typing."
+  },
+  "media": {
+    "images": [
+      {
+        "category": "hero_background",
+        "url": "https://static.prod-images.emergentagent.com/jobs/2e38b295-3ece-4a82-9e41-7f9dd39af90e/images/6a6db7016d6f11c9e088766c136e46e47e24f8f72c0b4c53f9a80b80e268718d.png",
+        "description": "Sleek modern dark mode 3D abstract background for the landing page."
+      },
+      {
+        "category": "editor_background",
+        "url": "https://static.prod-images.emergentagent.com/jobs/2e38b295-3ece-4a82-9e41-7f9dd39af90e/images/4c2fd970e852ec42931e2fadb0ab607d8667f3252cbb683bff4b6b6c84b36f59.png",
+        "description": "Cinematic close-up of a glowing mechanical keyboard on a dark desk for writing inspiration/loading screens."
+      },
+      {
+        "category": "esports_stage",
+        "url": "https://images.unsplash.com/photo-1557156105-c792d5220944?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1OTN8MHwxfHNlYXJjaHwyfHxlc3BvcnRzJTIwc3RhZ2UlMjBkYXJrfGVufDB8fHx8MTc3ODc4MTA1NXww&ixlib=rb-4.1.0&q=85",
+        "description": "Dark atmospheric esports stage for lobby or match history background."
+      }
+    ]
+  },
+  "instructions_to_main_agent": [
+    "Install and configure 'lucide-react' for icons.",
+    "Use standard Tailwind classes for dark mode explicitly, defaulting the entire app to dark mode.",
+    "Implement Shadcn UI heavily customized to remove standard borders and shadows. Use 1px #27272A borders everywhere for the 'Linear' look.",
+    "For the Editor page, ensure textarea has no outlines, no borders, and fills available height.",
+    "Use framer-motion for round transitions and leaderboard ranking swaps.",
+    "Add 'data-testid' to all buttons, links, and forms for automated testing.",
+    "Use JetBrains Mono explicitly for numbers, stats, and timers.",
+    "Never use purely transparent headers; use bg-black/60 with backdrop-blur-md for floating navigations."
+  ]
+}

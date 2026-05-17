@@ -1,0 +1,6 @@
+/* App-specific styles (most styling lives in index.css) */
+.App {
+  min-height: 100vh;
+  background: #000;
+  color: #fafafa;
+}
