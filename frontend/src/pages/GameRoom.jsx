@@ -243,7 +243,7 @@ export default function GameRoom() {
             {inFinalDuel ? "FINAL DUEL · DIALOGUE REQUIRED" : `ROUND ${game.current_round} OF ${settings.rounds}`}
           </div>
           <h1 className="font-display text-2xl md:text-3xl tracking-tight mt-1">
-            {scoringOpen ? "Judging phase" : currentRound?.completed ? "Round complete" : "Drafting phase"}
+            {scoringOpen ? "AI judging phase" : currentRound?.completed ? "Round complete" : "Drafting phase"}
           </h1>
         </div>
         {!scoringOpen && !currentRound?.completed && (
