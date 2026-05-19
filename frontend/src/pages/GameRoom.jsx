@@ -84,10 +84,15 @@ export default function GameRoom() {
       try {
         const msg = JSON.parse(e.data);
         if (msg.game) setGame(msg.game);
-        if (msg.type === "scoring_open" || msg.type === "round_advance" || msg.type === "game_over") {
-          loadSubmissions();
-          loadScores();
-        }
+        if (
+  msg.type === "scoring_open" ||
+  msg.type === "round_advance" ||
+  msg.type === "game_over" ||
+  msg.type === "ai_score_created"
+) {
+  loadSubmissions();
+  loadScores();
+}
       } catch {}
     };
     ws.onclose = () => { wsRef.current = null; };
