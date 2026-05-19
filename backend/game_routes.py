@@ -12,7 +12,7 @@ from models import (
 )
 from auth import get_current_user
 from ws_manager import manager
-from ai_prompts import generate_prompt
+from ai_prompts import generate_prompt, judge_submission
 
 router = APIRouter(prefix="/api", tags=["game"])
 
@@ -370,6 +370,9 @@ async def submit_writing(
         updated = await db.games.find_one({"game_id": game_id}, {"_id": 0})
         await manager.broadcast(game_id, {"type": "scoring_open", "game": updated})
 
+        # Trigger AI judging immediately
+        await _maybe_advance_round(db, game_id)
+
     return {"submission": _strip_game(sdoc)}
 
 
@@ -454,9 +457,64 @@ async def _maybe_advance_round(db, game_id: str):
         return
     active_players = [p for p in game["players"] if not p.get("eliminated")]
     n = len(active_players)
-    # Each player scores every OTHER player's submission => n*(n-1) scores expected
-    expected = n * (n - 1)
-    score_count = await db.scores.count_documents({"game_id": game_id, "round_number": rnum})
+
+    # AI Judge Mode: one AI score per active submission
+    expected = n
+
+    submissions = await db.submissions.find({
+        "game_id": game_id,
+        "round_number": rnum
+    }).to_list(50)
+
+    existing_ai_scores = await db.scores.count_documents({
+        "game_id": game_id,
+        "round_number": rnum,
+        "scored_by": "AI_JUDGE"
+    })
+
+    if existing_ai_scores == 0:
+        current_prompt = cur_round["prompt"]["text"]
+
+        for sub in submissions:
+            result = await judge_submission(
+                current_prompt,
+                sub["text"]
+            )
+
+            if result:
+                total = (
+                    result["grammar"]
+                    + result["engagement"]
+                    + result["creativity"]
+                    + result["accuracy"]
+                )
+
+                score = Score(
+                    game_id=game_id,
+                    round_number=rnum,
+                    submission_id=sub["submission_id"],
+                    submitted_by=sub["user_id"],
+                    scored_by="AI_JUDGE",
+                    grammar=result["grammar"],
+                    engagement=result["engagement"],
+                    creativity=result["creativity"],
+                    accuracy=result["accuracy"],
+                    feedback=result["feedback"],
+                    total=total,
+                )
+
+                sdoc = score.model_dump()
+                sdoc["created_at"] = sdoc["created_at"].isoformat()
+
+                await db.scores.insert_one(sdoc)
+                await manager.broadcast(game_id, {
+    "type": "ai_score_created"
+})
+    score_count = await db.scores.count_documents({
+        "game_id": game_id,
+        "round_number": rnum
+    })
+
     if score_count < expected:
         return
 

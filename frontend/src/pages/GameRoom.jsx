@@ -83,10 +83,15 @@ export default function GameRoom() {
       try {
         const msg = JSON.parse(e.data);
         if (msg.game) setGame(msg.game);
-        if (msg.type === "scoring_open" || msg.type === "round_advance" || msg.type === "game_over") {
-          loadSubmissions();
-          loadScores();
-        }
+        if (
+  msg.type === "scoring_open" ||
+  msg.type === "round_advance" ||
+  msg.type === "game_over" ||
+  msg.type === "ai_score_created"
+) {
+  loadSubmissions();
+  loadScores();
+}
       } catch {}
     };
     ws.onclose = () => { wsRef.current = null; };
@@ -247,7 +252,7 @@ export default function GameRoom() {
             {inFinalDuel ? "FINAL DUEL · DIALOGUE REQUIRED" : `ROUND ${game.current_round} OF ${settings.rounds}`}
           </div>
           <h1 className="font-display text-2xl md:text-3xl tracking-tight mt-1">
-            {scoringOpen ? "Judging phase" : currentRound?.completed ? "Round complete" : "Drafting phase"}
+            {scoringOpen ? "AI judging phase" : currentRound?.completed ? "Round complete" : "Drafting phase"}
           </h1>
         </div>
         {!scoringOpen && !currentRound?.completed && (
