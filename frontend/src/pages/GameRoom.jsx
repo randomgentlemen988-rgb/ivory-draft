@@ -242,6 +242,7 @@ export default function GameRoom() {
     return acc;
   }, {});
 
+
   const myEndsAt = currentRound?.ends_at;
 
   return (
@@ -321,7 +322,6 @@ export default function GameRoom() {
               <div className="font-mono text-[10px] tracking-[0.3em] text-zinc-500">
                 AI JUDGING · RESULTS
 
-              </div>
               {visibleSubs.map((s) => (
                 aiScoresBySubmission[s.submission_id] ? (
                   <div key={s.submission_id} className="glass rounded-xl p-5 hairline bg-zinc-950/70">

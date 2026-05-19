@@ -13,6 +13,7 @@ from models import (
 from auth import get_current_user
 from ws_manager import manager
 
+
 router = APIRouter(prefix="/api", tags=["game"])
 
 
@@ -370,8 +371,6 @@ async def submit_writing(
         await manager.broadcast(game_id, {"type": "scoring_open", "game": updated})
         await _run_ai_judging_for_round(db, game_id, rnum)
 
-        # Trigger AI judging immediately
-        await _maybe_advance_round(db, game_id)
 
     return {"submission": _strip_game(sdoc)}
 
