@@ -236,11 +236,12 @@ export default function GameRoom() {
   const scoringOpen = currentRound?.scoring_open && !currentRound?.completed;
   const visibleSubs = submissions;
   const aiScoresBySubmission = scores.reduce((acc, score) => {
-    if (score.submission_id) {
+
       acc[score.submission_id] = score;
     }
     return acc;
   }, {});
+
   const myEndsAt = currentRound?.ends_at;
 
   return (
@@ -319,6 +320,7 @@ export default function GameRoom() {
             <div className="space-y-4" data-testid="judging-list">
               <div className="font-mono text-[10px] tracking-[0.3em] text-zinc-500">
                 AI JUDGING · RESULTS
+
               </div>
               {visibleSubs.map((s) => (
                 aiScoresBySubmission[s.submission_id] ? (

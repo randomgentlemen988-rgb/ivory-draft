@@ -12,7 +12,6 @@ from models import (
 )
 from auth import get_current_user
 from ws_manager import manager
-from ai_prompts import generate_prompt, judge_submission
 
 router = APIRouter(prefix="/api", tags=["game"])
 
@@ -369,6 +368,7 @@ async def submit_writing(
         )
         updated = await db.games.find_one({"game_id": game_id}, {"_id": 0})
         await manager.broadcast(game_id, {"type": "scoring_open", "game": updated})
+        await _run_ai_judging_for_round(db, game_id, rnum)
 
         # Trigger AI judging immediately
         await _maybe_advance_round(db, game_id)
@@ -457,63 +457,6 @@ async def _maybe_advance_round(db, game_id: str):
         return
     active_players = [p for p in game["players"] if not p.get("eliminated")]
     n = len(active_players)
-
-    # AI Judge Mode: one AI score per active submission
-    expected = n
-
-    submissions = await db.submissions.find({
-        "game_id": game_id,
-        "round_number": rnum
-    }).to_list(50)
-
-    existing_ai_scores = await db.scores.count_documents({
-        "game_id": game_id,
-        "round_number": rnum,
-        "scored_by": "AI_JUDGE"
-    })
-
-    if existing_ai_scores == 0:
-        current_prompt = cur_round["prompt"]["text"]
-
-        for sub in submissions:
-            result = await judge_submission(
-                current_prompt,
-                sub["text"]
-            )
-
-            if result:
-                total = (
-                    result["grammar"]
-                    + result["engagement"]
-                    + result["creativity"]
-                    + result["accuracy"]
-                )
-
-                score = Score(
-                    game_id=game_id,
-                    round_number=rnum,
-                    submission_id=sub["submission_id"],
-                    submitted_by=sub["user_id"],
-                    scored_by="AI_JUDGE",
-                    grammar=result["grammar"],
-                    engagement=result["engagement"],
-                    creativity=result["creativity"],
-                    accuracy=result["accuracy"],
-                    feedback=result["feedback"],
-                    total=total,
-                )
-
-                sdoc = score.model_dump()
-                sdoc["created_at"] = sdoc["created_at"].isoformat()
-
-                await db.scores.insert_one(sdoc)
-                await manager.broadcast(game_id, {
-    "type": "ai_score_created"
-})
-    score_count = await db.scores.count_documents({
-        "game_id": game_id,
-        "round_number": rnum
-    })
 
     if score_count < expected:
         return
@@ -611,6 +554,52 @@ async def _maybe_advance_round(db, game_id: str):
     )
     updated = await db.games.find_one({"game_id": game_id}, {"_id": 0})
     await manager.broadcast(game_id, {"type": "round_advance", "game": updated})
+
+
+async def _run_ai_judging_for_round(db, game_id: str, round_number: int):
+    game = await db.games.find_one({"game_id": game_id}, {"_id": 0})
+    if not game or round_number < 1 or round_number > len(game["rounds"]):
+        return
+    print(f"[ai_judging] AI judging started: game_id={game_id} round={round_number}")
+    round_data = game["rounds"][round_number - 1]
+    prompt_text = (round_data.get("prompt") or {}).get("text", "")
+    subs = await db.submissions.find(
+        {"game_id": game_id, "round_number": round_number},
+        {"_id": 0},
+    ).to_list(200)
+    for sub in subs:
+        sid = sub["submission_id"]
+        existing = await db.scores.find_one(
+            {"game_id": game_id, "round_number": round_number, "submission_id": sid, "scored_by": "ai_judge"},
+            {"_id": 0},
+        )
+        if existing:
+            continue
+        judged = await judge_submission(prompt_text=prompt_text, submission_text=sub.get("text", ""))
+        total = judged["grammar"] + judged["engagement"] + judged["creativity"] + judged["accuracy"]
+        score = Score(
+            game_id=game_id,
+            round_number=round_number,
+            submission_id=sid,
+            submitted_by=sub["user_id"],
+            scored_by="ai_judge",
+            grammar=judged["grammar"],
+            engagement=judged["engagement"],
+            creativity=judged["creativity"],
+            accuracy=judged["accuracy"],
+            feedback=judged.get("feedback"),
+            total=total,
+        )
+        sdoc = score.model_dump()
+        sdoc["created_at"] = sdoc["created_at"].isoformat()
+        await db.scores.insert_one(sdoc)
+        await manager.broadcast(game_id, {"type": "ai_score_created", "submission_id": sid, "score": _strip_game(sdoc)})
+        print(f"[ai_judging] AI score saved for submission_id={sid}")
+        if judged.get("_fallback"):
+            print(f"[ai_judging] AI parse failed/fallback used: submission_id={sid}")
+
+    print(f"[ai_judging] AI judging completed for round: game_id={game_id} round={round_number}")
+    await _maybe_advance_round(db, game_id)
 
 
 @router.get("/games/{game_id}/scores")
