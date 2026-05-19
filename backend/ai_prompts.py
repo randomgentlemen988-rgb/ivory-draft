@@ -75,3 +75,72 @@ async def generate_prompt(genre: str = "Fantasy", difficulty: str = "medium") ->
     if last_err:
         print(f"[ai_prompts] All models failed: {last_err}")
     return None
+JUDGE_SYSTEM_PROMPT = """
+You are an elite literary judge for a competitive writing arena called Ivory Draft.
+
+You score submissions in four categories from 1-10:
+- grammar
+- engagement
+- creativity
+- accuracy
+
+Return ONLY valid JSON in this exact format:
+
+{
+  "grammar": 8,
+  "engagement": 7,
+  "creativity": 9,
+  "accuracy": 8,
+  "feedback": "Short feedback here"
+}
+
+Keep feedback under 40 words.
+"""
+
+
+async def judge_submission(prompt_text: str, submission_text: str):
+    api_key = os.environ.get("OPENROUTER_API_KEY", "").strip()
+
+    if not api_key:
+        return None
+
+    user_msg = f"""
+PROMPT:
+{prompt_text}
+
+SUBMISSION:
+{submission_text}
+"""
+
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        r = await client.post(
+            OPENROUTER_URL,
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": "nvidia/nemotron-3-super-120b-a12b:free",
+                "messages": [
+                    {"role": "system", "content": JUDGE_SYSTEM_PROMPT},
+                    {"role": "user", "content": user_msg},
+                ],
+                "temperature": 0.4,
+                "max_tokens": 300,
+            },
+        )
+
+        if r.status_code != 200:
+            print(r.text)
+            return None
+
+        data = r.json()
+        content = data["choices"][0]["message"]["content"]
+
+        import json
+
+        try:
+            return json.loads(content)
+        except Exception:
+            print(content)
+            return None
