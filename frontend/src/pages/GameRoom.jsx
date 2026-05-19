@@ -83,10 +83,15 @@ export default function GameRoom() {
       try {
         const msg = JSON.parse(e.data);
         if (msg.game) setGame(msg.game);
-        if (msg.type === "scoring_open" || msg.type === "round_advance" || msg.type === "game_over") {
-          loadSubmissions();
-          loadScores();
-        }
+        if (
+  msg.type === "scoring_open" ||
+  msg.type === "round_advance" ||
+  msg.type === "game_over" ||
+  msg.type === "ai_score_created"
+) {
+  loadSubmissions();
+  loadScores();
+}
       } catch {}
     };
     ws.onclose = () => { wsRef.current = null; };
@@ -231,14 +236,12 @@ export default function GameRoom() {
   const scoringOpen = currentRound?.scoring_open && !currentRound?.completed;
   const visibleSubs = submissions;
   const aiScoresBySubmission = scores.reduce((acc, score) => {
-    if (score.submission_id && score.scored_by === "ai_judge") {
+
       acc[score.submission_id] = score;
     }
     return acc;
   }, {});
-  const totalSubmissions = visibleSubs.length;
-  const scoredSubmissions = visibleSubs.filter((s) => aiScoresBySubmission[s.submission_id]).length;
-  const allScoresExist = totalSubmissions > 0 && scoredSubmissions >= totalSubmissions;
+
   const myEndsAt = currentRound?.ends_at;
 
   return (
@@ -250,7 +253,7 @@ export default function GameRoom() {
             {inFinalDuel ? "FINAL DUEL · DIALOGUE REQUIRED" : `ROUND ${game.current_round} OF ${settings.rounds}`}
           </div>
           <h1 className="font-display text-2xl md:text-3xl tracking-tight mt-1">
-            {scoringOpen ? "Judging phase" : currentRound?.completed ? "Round complete" : "Drafting phase"}
+            {scoringOpen ? "AI judging phase" : currentRound?.completed ? "Round complete" : "Drafting phase"}
           </h1>
         </div>
         {!scoringOpen && !currentRound?.completed && (
@@ -317,11 +320,7 @@ export default function GameRoom() {
             <div className="space-y-4" data-testid="judging-list">
               <div className="font-mono text-[10px] tracking-[0.3em] text-zinc-500">
                 AI JUDGING · RESULTS
-              </div>
-              <div className="text-sm text-zinc-400">
-                {allScoresExist
-                  ? "Preparing next round…"
-                  : `AI judging in progress · ${scoredSubmissions}/${totalSubmissions} scored`}
+
               </div>
               {visibleSubs.map((s) => (
                 aiScoresBySubmission[s.submission_id] ? (
