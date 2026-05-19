@@ -231,7 +231,7 @@ export default function GameRoom() {
   const scoringOpen = currentRound?.scoring_open && !currentRound?.completed;
   const visibleSubs = submissions;
   const aiScoresBySubmission = scores.reduce((acc, score) => {
-    if (score.submission_id) {
+    if (score.submission_id && score.scored_by === "ai_judge") {
       acc[score.submission_id] = score;
     }
     return acc;
