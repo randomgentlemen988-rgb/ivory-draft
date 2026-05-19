@@ -7,7 +7,6 @@ import Timer from "@/components/Timer";
 import Editor from "@/components/Editor";
 import PromptCard from "@/components/PromptCard";
 import PlayerList from "@/components/PlayerList";
-import ScoringPanel from "@/components/ScoringPanel";
 import { Play, Trophy, ArrowLeft, Send, LogOut } from "lucide-react";
 
 export default function GameRoom() {
@@ -230,8 +229,16 @@ export default function GameRoom() {
 
   // ---- IN-PROGRESS / DUEL VIEW ----
   const scoringOpen = currentRound?.scoring_open && !currentRound?.completed;
-  const otherSubs = submissions.filter((s) => s.user_id !== user.user_id);
-  const alreadyScored = new Set(scores.filter((s) => s.scored_by === user.user_id).map((s) => s.submission_id));
+  const visibleSubs = submissions;
+  const aiScoresBySubmission = scores.reduce((acc, score) => {
+    if (score.submission_id && score.scored_by === "ai_judge") {
+      acc[score.submission_id] = score;
+    }
+    return acc;
+  }, {});
+  const totalSubmissions = visibleSubs.length;
+  const scoredSubmissions = visibleSubs.filter((s) => aiScoresBySubmission[s.submission_id]).length;
+  const allScoresExist = totalSubmissions > 0 && scoredSubmissions >= totalSubmissions;
   const myEndsAt = currentRound?.ends_at;
 
   return (
@@ -308,19 +315,38 @@ export default function GameRoom() {
           {/* Scoring */}
           {scoringOpen && (
             <div className="space-y-4" data-testid="judging-list">
-              <div className="font-mono text-[10px] tracking-[0.3em] text-zinc-500">
-                JUDGE THE OTHERS · {otherSubs.length - alreadyScored.size} REMAINING
+              <div className="font-mono text-[10px] tracking-[0.3em] text-zinc-500">AI JUDGING · RESULTS</div>
+              <div className="text-sm text-zinc-400">
+                {allScoresExist ? "Preparing next round…" : `AI judging in progress · ${scoredSubmissions}/${totalSubmissions} scored`}
               </div>
-              {otherSubs.map((s) => (
-                alreadyScored.has(s.submission_id) ? (
-                  <div key={s.submission_id} className="hairline rounded-xl p-4 bg-zinc-950 opacity-60 text-sm text-zinc-400">
-                    <span className="font-mono text-[10px] tracking-widest mr-3">SCORED</span> {s.text.slice(0, 80)}…
+
+              {visibleSubs.map((s) => {
+                const score = aiScoresBySubmission[s.submission_id];
+                if (!score) {
+                  return (
+                    <div key={s.submission_id} className="hairline rounded-xl p-10 text-center text-zinc-500 text-sm bg-zinc-950">
+                      Awaiting AI evaluation…
+                    </div>
+                  );
+                }
+                return (
+                  <div key={s.submission_id} className="glass rounded-xl p-5 hairline bg-zinc-950/70">
+                    <div className="font-mono text-[10px] tracking-widest text-zinc-500">AI SCORECARD</div>
+                    <div className="text-sm text-zinc-300 mt-3">{s.text.slice(0, 120)}…</div>
+                    <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                      {["grammar", "engagement", "creativity", "accuracy"].map((k) => (
+                        <div key={k} className="hairline rounded-md px-3 py-2 bg-zinc-900/70">
+                          <div className="font-mono text-[10px] tracking-widest text-zinc-500 uppercase">{k}</div>
+                          <div className="font-mono text-sm text-white tabular-nums">{(score[k] ?? 0).toFixed(1)}</div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-4 text-sm text-zinc-400">{score.feedback || "AI feedback pending…"}</div>
                   </div>
-                ) : (
-                  <ScoringPanel key={s.submission_id} gameId={gameId} submission={s} onScored={loadScores} />
-                )
-              ))}
-              {otherSubs.length === 0 && (
+                );
+              })}
+
+              {visibleSubs.length === 0 && (
                 <div className="hairline rounded-xl p-10 text-center text-zinc-500 text-sm bg-zinc-950">
                   Waiting for submissions to finalize…
                 </div>
