@@ -12,6 +12,8 @@ from models import (
 )
 from auth import get_current_user
 from ws_manager import manager
+from ai_prompts import generate_prompt
+from ai_judging import judge_submission
 
 router = APIRouter(prefix="/api", tags=["game"])
 
@@ -370,9 +372,6 @@ async def submit_writing(
         await manager.broadcast(game_id, {"type": "scoring_open", "game": updated})
         await _run_ai_judging_for_round(db, game_id, rnum)
 
-        # Trigger AI judging immediately
-        await _maybe_advance_round(db, game_id)
-
     return {"submission": _strip_game(sdoc)}
 
 
@@ -457,7 +456,14 @@ async def _maybe_advance_round(db, game_id: str):
         return
     active_players = [p for p in game["players"] if not p.get("eliminated")]
     n = len(active_players)
-
+    submissions_count = await db.submissions.count_documents({"game_id": game_id, "round_number": rnum})
+    ai_scores_count = await db.scores.count_documents(
+        {"game_id": game_id, "round_number": rnum, "scored_by": "ai_judge"}
+    )
+    expected = submissions_count if ai_scores_count > 0 else n * (n - 1)
+    score_count = ai_scores_count if ai_scores_count > 0 else await db.scores.count_documents(
+        {"game_id": game_id, "round_number": rnum}
+    )
     if score_count < expected:
         return
 
