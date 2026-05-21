@@ -83,10 +83,15 @@ export default function GameRoom() {
       try {
         const msg = JSON.parse(e.data);
         if (msg.game) setGame(msg.game);
-        if (msg.type === "scoring_open" || msg.type === "round_advance" || msg.type === "game_over") {
-          loadSubmissions();
-          loadScores();
-        }
+        if (
+  msg.type === "scoring_open" ||
+  msg.type === "round_advance" ||
+  msg.type === "game_over" ||
+  msg.type === "ai_score_created"
+) {
+  loadSubmissions();
+  loadScores();
+}
       } catch {}
     };
     ws.onclose = () => { wsRef.current = null; };
@@ -231,14 +236,12 @@ export default function GameRoom() {
   const scoringOpen = currentRound?.scoring_open && !currentRound?.completed;
   const visibleSubs = submissions;
   const aiScoresBySubmission = scores.reduce((acc, score) => {
-    if (score.submission_id && score.scored_by === "ai_judge") {
+
       acc[score.submission_id] = score;
     }
     return acc;
   }, {});
-  const totalSubmissions = visibleSubs.length;
-  const scoredSubmissions = visibleSubs.filter((s) => aiScoresBySubmission[s.submission_id]).length;
-  const allScoresExist = totalSubmissions > 0 && scoredSubmissions >= totalSubmissions;
+
   const myEndsAt = currentRound?.ends_at;
 
   return (
@@ -250,7 +253,7 @@ export default function GameRoom() {
             {inFinalDuel ? "FINAL DUEL · DIALOGUE REQUIRED" : `ROUND ${game.current_round} OF ${settings.rounds}`}
           </div>
           <h1 className="font-display text-2xl md:text-3xl tracking-tight mt-1">
-            {scoringOpen ? "Judging phase" : currentRound?.completed ? "Round complete" : "Drafting phase"}
+            {scoringOpen ? "AI judging phase" : currentRound?.completed ? "Round complete" : "Drafting phase"}
           </h1>
         </div>
         {!scoringOpen && !currentRound?.completed && (
@@ -315,53 +318,35 @@ export default function GameRoom() {
           {/* Scoring */}
           {scoringOpen && (
             <div className="space-y-4" data-testid="judging-list">
-              <div className="font-mono text-[10px] tracking-[0.3em] text-zinc-500">AI JUDGING · RESULTS</div>
-              <div className="text-sm text-zinc-400">
-                {allScoresExist ? "Preparing next round…" : `AI judging in progress · ${scoredSubmissions}/${totalSubmissions} scored`}
-              </div>
+              <div className="font-mono text-[10px] tracking-[0.3em] text-zinc-500">
+                AI JUDGING · RESULTS
 
-              {visibleSubs.map((s) => {
-                const score = aiScoresBySubmission[s.submission_id];
-                if (!score) {
-                  return (
-                    <div key={s.submission_id} className="hairline rounded-xl p-10 text-center text-zinc-500 text-sm bg-zinc-950">
-                      Awaiting AI evaluation…
-                    </div>
-                  );
-                }
-                return (
+              </div>
+              {visibleSubs.map((s) => (
+                aiScoresBySubmission[s.submission_id] ? (
                   <div key={s.submission_id} className="glass rounded-xl p-5 hairline bg-zinc-950/70">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="font-mono text-[10px] tracking-widest text-zinc-500">AI SCORECARD</div>
-                      <div className="hairline rounded-md px-3 py-1 bg-zinc-900/70">
-                        <div className="font-mono text-[10px] tracking-widest text-zinc-500">TOTAL</div>
-                        <div className="font-mono text-sm text-white tabular-nums text-right">
-                          {(
-                            (score.grammar ?? 0) +
-                            (score.engagement ?? 0) +
-                            (score.creativity ?? 0) +
-                            (score.accuracy ?? 0)
-                          ).toFixed(1)}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="text-sm text-zinc-300 mt-3 leading-relaxed">{s.text.slice(0, 120)}…</div>
+                    <div className="font-mono text-[10px] tracking-widest text-zinc-500">AI SCORECARD</div>
+                    <div className="text-sm text-zinc-300 mt-3">{s.text.slice(0, 120)}…</div>
                     <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
                       {["grammar", "engagement", "creativity", "accuracy"].map((k) => (
                         <div key={k} className="hairline rounded-md px-3 py-2 bg-zinc-900/70">
                           <div className="font-mono text-[10px] tracking-widest text-zinc-500 uppercase">{k}</div>
-                          <div className="font-mono text-sm text-white tabular-nums">{(score[k] ?? 0).toFixed(1)}</div>
+                          <div className="font-mono text-sm text-white tabular-nums">
+                            {(aiScoresBySubmission[s.submission_id][k] ?? 0).toFixed(1)}
+                          </div>
                         </div>
                       ))}
                     </div>
-                    <div className="mt-4 hairline rounded-md bg-zinc-900/60 p-3">
-                      <div className="font-mono text-[10px] tracking-widest text-zinc-500 mb-1">AI FEEDBACK</div>
-                      <div className="text-sm text-zinc-300">{score.feedback || "AI feedback pending…"}</div>
+                    <div className="mt-4 text-sm text-zinc-400">
+                      {aiScoresBySubmission[s.submission_id].feedback || "AI feedback pending…"}
                     </div>
                   </div>
-                );
-              })}
-
+                ) : (
+                  <div key={s.submission_id} className="hairline rounded-xl p-10 text-center text-zinc-500 text-sm bg-zinc-950">
+                    Awaiting AI evaluation…
+                  </div>
+                )
+              ))}
               {visibleSubs.length === 0 && (
                 <div className="hairline rounded-xl p-10 text-center text-zinc-500 text-sm bg-zinc-950">
                   Waiting for submissions to finalize…
