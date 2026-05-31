@@ -74,6 +74,14 @@ function AppRouter() {
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/admin/ai"
+        element={
+          <ProtectedRoute>
+            <Shell><AdminAI /></Shell>
+          </ProtectedRoute>
+        }
+      />
     </Routes>
   );
 }
