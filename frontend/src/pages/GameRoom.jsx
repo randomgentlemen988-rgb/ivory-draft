@@ -233,16 +233,35 @@ export default function GameRoom() {
   }
 
   // ---- IN-PROGRESS / DUEL VIEW ----
-  const scoringOpen = currentRound?.scoring_open && !currentRound?.completed;
-  const visibleSubs = submissions;
-  const aiScoresBySubmission = scores.reduce((acc, score) => {
+const scoringOpen =
+  currentRound?.scoring_open &&
+  !currentRound?.completed;
 
-      acc[score.submission_id] = score;
-    }
-    return acc;
-  }, {});
+const visibleSubs = submissions || [];
 
-  const myEndsAt = currentRound?.ends_at;
+const aiScoresBySubmission = {};
+
+for (const score of scores || []) {
+  if (
+    score &&
+    score.submission_id &&
+    score.scored_by === "ai_judge"
+  ) {
+    aiScoresBySubmission[score.submission_id] = score;
+  }
+}
+
+const totalSubmissions = visibleSubs.length;
+
+const scoredSubmissions = visibleSubs.filter((s) => {
+  return aiScoresBySubmission[s.submission_id];
+}).length;
+
+const allScoresExist =
+  totalSubmissions > 0 &&
+  scoredSubmissions >= totalSubmissions;
+
+const myEndsAt = currentRound?.ends_at;
 
   return (
     <div className="max-w-7xl mx-auto px-6 lg:px-10 py-8" data-testid="game-active-view">

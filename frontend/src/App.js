@@ -15,6 +15,7 @@ import GameRoom from "@/pages/GameRoom";
 import Profile from "@/pages/Profile";
 import Leaderboard from "@/pages/Leaderboard";
 import Admin from "@/pages/Admin";
+import AdminAI from "@/pages/AdminAI";
 
 function AppRouter() {
   const location = useLocation();
