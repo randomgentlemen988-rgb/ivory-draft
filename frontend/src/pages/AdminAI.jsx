@@ -226,20 +226,12 @@ export default function AdminAI() {
   const [isCreatingPR, setIsCreatingPR] = useState(false);
   const [error, setError] = useState(null);
 
-  // Check admin access
-  if (!user || user.role !== "admin") {
-    return (
-      <div className="max-w-7xl mx-auto px-6 lg:px-10 py-10">
-        <ErrorState
-          message="Access denied. Admin privileges required to access AI Forge."
-          onRetry={null}
-        />
-      </div>
-    );
-  }
+  const isAdmin = user && user.role === "admin";
 
-  // Simulate loading history on mount
+  // Load history on mount (must be before any early returns)
   useEffect(() => {
+    if (!isAdmin) return;
+    
     const loadHistory = async () => {
       setIsLoadingHistory(true);
       setError(null);
@@ -255,7 +247,19 @@ export default function AdminAI() {
       }
     };
     loadHistory();
-  }, []);
+  }, [isAdmin]);
+
+  // Check admin access (after all hooks)
+  if (!isAdmin) {
+    return (
+      <div className="max-w-7xl mx-auto px-6 lg:px-10 py-10">
+        <ErrorState
+          message="Access denied. Admin privileges required to access AI Forge."
+          onRetry={null}
+        />
+      </div>
+    );
+  }
 
   // Handlers
   const handleGeneratePlan = async () => {
