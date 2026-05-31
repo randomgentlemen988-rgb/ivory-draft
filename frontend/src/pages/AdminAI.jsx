@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { api } from "@/lib/api";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -329,11 +330,17 @@ export default function AdminAI() {
 
     setIsSavingDraft(true);
     try {
-      // Simulated delay - replace with actual API call
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      await api.post("/admin/ai/drafts", {
+        title: featureRequest.trim().slice(0, 100) || "Untitled Draft",
+        description: featureRequest.trim(),
+        plan: generatedPlan,
+        files: filesToChange,
+        risk: riskLevel,
+      });
       toast.success("Draft saved");
     } catch (e) {
-      toast.error("Failed to save draft");
+      const message = e.response?.data?.error || "Failed to save draft";
+      toast.error(message);
     } finally {
       setIsSavingDraft(false);
     }
