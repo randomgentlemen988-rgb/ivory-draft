@@ -22,6 +22,9 @@ if (config.enableHealthCheck) {
   healthPluginInstance = new WebpackHealthPlugin();
 }
 
+// Always load admin AI endpoints (no special config needed)
+const setupAdminAIEndpoints = require("./plugins/admin-ai/admin-ai-endpoints");
+
 let webpackConfig = {
   eslint: {
     configure: {
@@ -61,22 +64,24 @@ let webpackConfig = {
 };
 
 webpackConfig.devServer = (devServerConfig) => {
-  // Add health check endpoints if enabled
-  if (config.enableHealthCheck && setupHealthEndpoints && healthPluginInstance) {
-    const originalSetupMiddlewares = devServerConfig.setupMiddlewares;
+  const originalSetupMiddlewares = devServerConfig.setupMiddlewares;
 
-    devServerConfig.setupMiddlewares = (middlewares, devServer) => {
-      // Call original setup if exists
-      if (originalSetupMiddlewares) {
-        middlewares = originalSetupMiddlewares(middlewares, devServer);
-      }
+  devServerConfig.setupMiddlewares = (middlewares, devServer) => {
+    // Call original setup if exists
+    if (originalSetupMiddlewares) {
+      middlewares = originalSetupMiddlewares(middlewares, devServer);
+    }
 
-      // Setup health endpoints
+    // Setup health endpoints if enabled
+    if (config.enableHealthCheck && setupHealthEndpoints && healthPluginInstance) {
       setupHealthEndpoints(devServer, healthPluginInstance);
+    }
 
-      return middlewares;
-    };
-  }
+    // Setup admin AI endpoints
+    setupAdminAIEndpoints(devServer);
+
+    return middlewares;
+  };
 
   return devServerConfig;
 };
