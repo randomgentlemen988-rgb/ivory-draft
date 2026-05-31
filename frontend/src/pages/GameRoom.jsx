@@ -82,6 +82,12 @@ export default function GameRoom() {
     ws.onmessage = (e) => {
       try {
         const msg = JSON.parse(e.data);
+        // Handle lobby deletion - redirect user back to lobby
+        if (msg.type === "game_deleted") {
+          toast.info("This lobby was closed");
+          navigate("/lobby");
+          return;
+        }
         if (msg.game) setGame(msg.game);
         if (
   msg.type === "scoring_open" ||
@@ -96,7 +102,7 @@ export default function GameRoom() {
     };
     ws.onclose = () => { wsRef.current = null; };
     return () => { try { ws.close(); } catch {} };
-  }, [gameId, loadSubmissions, loadScores]);
+  }, [gameId, loadSubmissions, loadScores, navigate]);
 
   if (!game) return <div className="min-h-screen flex items-center justify-center text-zinc-500 font-mono text-xs tracking-widest">LOADING ARENA…</div>;
 

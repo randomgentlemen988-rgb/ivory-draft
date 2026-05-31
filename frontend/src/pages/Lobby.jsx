@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
-import { Plus, KeyRound, Users, Globe, Lock, Clock, BookOpen } from "lucide-react";
+import { Plus, KeyRound, Users, Globe, Lock, Clock, BookOpen, X } from "lucide-react";
 
 export default function Lobby() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { user } = useAuth();
   const initialCode = searchParams.get("code") || "";
   const [joinCode, setJoinCode] = useState(initialCode);
   const [publicGames, setPublicGames] = useState([]);
@@ -22,6 +24,7 @@ export default function Lobby() {
     private: false,
   });
   const [creating, setCreating] = useState(false);
+  const [confirmClose, setConfirmClose] = useState(null);
 
   useEffect(() => {
     (async () => {
@@ -66,6 +69,23 @@ export default function Lobby() {
         ? s.genre_filter.filter((x) => x !== g)
         : [...s.genre_filter, g],
     }));
+  };
+
+  const handleCloseLobby = async (gameId) => {
+    try {
+      await api.delete(`/games/${gameId}`);
+      setPublicGames((prev) => prev.filter((g) => g.game_id !== gameId));
+      toast.success("Lobby closed");
+    } catch (e) {
+      toast.error(e.response?.data?.detail || "Could not close lobby");
+    } finally {
+      setConfirmClose(null);
+    }
+  };
+
+  const canCloseLobby = (game) => {
+    if (!user) return false;
+    return game.host_id === user.user_id || user.role === "admin";
   };
 
   return (
@@ -115,24 +135,55 @@ export default function Lobby() {
                 </div>
               )}
               {publicGames.map((g) => (
-                <button
+                <div
                   key={g.game_id}
-                  data-testid={`lobby-row-${g.join_code}`}
-                  onClick={() => setJoinCode(g.join_code)}
-                  className="w-full text-left px-6 py-4 hover:bg-white/5 transition-colors flex items-center justify-between"
+                  className="w-full px-6 py-4 hover:bg-white/5 transition-colors flex items-center justify-between"
                 >
-                  <div className="flex items-center gap-4">
+                  <button
+                    data-testid={`lobby-row-${g.join_code}`}
+                    onClick={() => setJoinCode(g.join_code)}
+                    className="flex-1 text-left flex items-center gap-4"
+                  >
                     <div className="font-mono text-sm tracking-widest text-white">{g.join_code}</div>
                     <div className="text-xs text-zinc-500">
                       <span className="text-zinc-300">{g.players?.length}/6</span> · {Math.round((g.settings?.round_seconds || 1200)/60)} min/round · {g.settings?.rounds} rounds
                     </div>
-                  </div>
+                  </button>
                   <div className="flex items-center gap-2">
                     {(g.settings?.genre_filter || []).slice(0, 2).map((x) => (
                       <span key={x} className="font-mono text-[10px] tracking-widest text-zinc-400 hairline rounded-sm px-1.5 py-0.5">{x}</span>
                     ))}
+                    {canCloseLobby(g) && (
+                      confirmClose === g.game_id ? (
+                        <div className="flex items-center gap-2 ml-2">
+                          <span className="text-xs text-zinc-400">Close this lobby?</span>
+                          <button
+                            onClick={() => handleCloseLobby(g.game_id)}
+                            data-testid={`confirm-close-${g.join_code}`}
+                            className="text-xs px-2 py-1 rounded border border-red-500/50 text-red-400 hover:bg-red-500/10"
+                          >
+                            Yes
+                          </button>
+                          <button
+                            onClick={() => setConfirmClose(null)}
+                            className="text-xs px-2 py-1 rounded border border-zinc-600 text-zinc-400 hover:bg-zinc-700/50"
+                          >
+                            No
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setConfirmClose(g.game_id); }}
+                          data-testid={`close-lobby-${g.join_code}`}
+                          title="Close lobby"
+                          className="ml-2 p-1.5 rounded border border-zinc-700 text-zinc-400 hover:border-red-500/50 hover:text-red-400 transition-colors"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )
+                    )}
                   </div>
-                </button>
+                </div>
               ))}
             </div>
           </div>

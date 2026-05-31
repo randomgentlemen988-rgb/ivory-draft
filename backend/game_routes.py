@@ -142,6 +142,7 @@ async def create_game(
 @router.get("/games/public")
 async def list_public_games(request: Request):
     db = await _db(request)
+    # Only show lobby games that are not cancelled
     rows = await db.games.find(
         {"status": "lobby", "settings.private": False},
         {"_id": 0},
@@ -158,6 +159,41 @@ async def get_game(game_id: str, request: Request):
     return doc
 
 
+@router.delete("/games/{game_id}")
+async def delete_game(
+    game_id: str,
+    request: Request,
+    user: User = Depends(get_current_user),
+):
+    """Soft-delete a game. Only host or admin can delete."""
+    db = await _db(request)
+    game = await db.games.find_one({"game_id": game_id}, {"_id": 0})
+    if not game:
+        raise HTTPException(404, "Game not found")
+    
+    # Authorization: must be host or admin
+    is_host = game["host_id"] == user.user_id
+    is_admin = user.role == "admin"
+    if not is_host and not is_admin:
+        raise HTTPException(403, "Only the host or an admin can close this lobby")
+    
+    # Soft-delete: set status to cancelled and add deleted_at timestamp
+    now = _now_iso()
+    await db.games.update_one(
+        {"game_id": game_id},
+        {"$set": {
+            "status": "cancelled",
+            "deleted_at": now,
+            "updated_at": now,
+        }},
+    )
+    
+    # Broadcast game_deleted event to all connected clients
+    await manager.broadcast(game_id, {"type": "game_deleted", "game_id": game_id})
+    
+    return {"ok": True, "game_id": game_id, "status": "cancelled"}
+
+
 @router.post("/games/join")
 async def join_game(
     payload: GameJoin,
@@ -168,6 +204,8 @@ async def join_game(
     game = await db.games.find_one({"join_code": payload.join_code.upper()}, {"_id": 0})
     if not game:
         raise HTTPException(404, "Game not found")
+    if game["status"] == "cancelled":
+        raise HTTPException(400, "This lobby has been closed")
     if game["status"] != "lobby":
         raise HTTPException(400, "Game already started")
     players = game.get("players", [])
